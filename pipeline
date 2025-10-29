@@ -1,0 +1,78 @@
+version: 2.1
+
+jobs:
+  # Test job
+  test:
+    docker:
+      - image: cimg/base:stable   # General Linux image with common tools
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            echo "Installing dependencies..."
+            if [ -f package.json ]; then
+              npm install
+            elif [ -f requirements.txt ]; then
+              pip install -r requirements.txt
+            else
+              echo "No dependency file found, skipping..."
+            fi
+      - run:
+          name: Run Tests
+          command: |
+            echo "Running tests..."
+            if [ -f package.json ]; then
+              npm test || echo "No test script found"
+            elif [ -f pytest.ini ] || [ -d tests ]; then
+              pytest || echo "No pytest found"
+            else
+              echo "No tests found."
+            fi
+
+  #  Build job
+  build:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: Build Project
+          command: |
+            echo "Building project..."
+            mkdir -p dist
+            echo "Build artifact" > dist/artifact.txt
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+
+  #  Deploy job (only runs on main branch)
+  deploy:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Deploy
+          command: |
+            echo "Deploying application..."
+            # Add your actual deployment commands here
+            # e.g. scp dist/artifact.txt user@server:/var/www/app/
+            echo "Deployment complete."
+
+workflows:
+  version: 2
+  ci_cd_pipeline:
+    jobs:
+      - test
+      - build:
+          requires:
+            - test
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: main
